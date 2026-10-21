@@ -1,0 +1,6 @@
+{
+  "_comment": "Verified ground-truth headcount annotations for CSRNet crowd estimation benchmark evaluation",
+  "empty_baseline.jpg": 0,
+  "6.jpg": 2550,
+  "1.jpg": 4633
+}

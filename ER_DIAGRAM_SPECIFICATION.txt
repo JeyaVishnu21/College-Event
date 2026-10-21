@@ -1,0 +1,480 @@
+================================================================================
+CROWD EVENT MANAGEMENT SYSTEM - DATABASE SCHEMA & ER DIAGRAM SPECIFICATION
+================================================================================
+Database Name : crowd_event_db
+Engine        : MySQL 8.x+ / MariaDB (InnoDB, utf8mb4)
+Total Tables  : 7 (users, venues, fest, events, images, crowd_analyses, alerts)
+Purpose       : Complete attribute specification, relationships, cardinalities,
+                and ER diagram syntax for modeling the database.
+================================================================================
+
+--------------------------------------------------------------------------------
+1. SUMMARY OF TABLES & THEIR PURPOSES
+--------------------------------------------------------------------------------
+1. users          : Stores system users across 2 roles (administrator, organizer).
+2. venues         : Campus event venues with capacities managed by college administrator.
+3. fest           : Groupings for multi-event festivals or celebrations (e.g., "Legacy 2K26").
+4. events         : Event proposals, requested/approved schedules, assigned venues and series.
+5. images         : Real-time CCTV / crowd monitoring images captured during live events.
+6. crowd_analyses : AI/CSRNet model inference results and predicted headcount per image.
+7. alerts         : Overcrowding safety breach notifications dispatched to administrator & organizers.
+
+================================================================================
+2. DETAILED TABLE SPECIFICATIONS (ATTRIBUTES & CONSTRAINTS)
+================================================================================
+
+--------------------------------------------------------------------------------
+TABLE 1: users
+--------------------------------------------------------------------------------
+Description: Represents all registered campus stakeholders.
+
+Column Name   | Data Type                                   | Constraints               | Default           | Description
+--------------+---------------------------------------------+---------------------------+-------------------+-------------------------------------------
+id            | INT                                         | PRIMARY KEY, AUTO_INCR    | -                 | Unique user identifier (PK)
+name          | VARCHAR(100)                                | NOT NULL                  | -                 | User's full name
+email         | VARCHAR(150)                                | NOT NULL, UNIQUE          | -                 | Unique email address used for login
+password_hash | VARCHAR(255)                                | NOT NULL                  | -                 | Secure password hash (bcrypt)
+role          | ENUM('administrator','organizer')          | NOT NULL                  | -                 | Role-based access level
+created_at    | TIMESTAMP                                   | DEFAULT CURRENT_TIMESTAMP | CURRENT_TIMESTAMP | Account creation timestamp
+updated_at    | TIMESTAMP                                   | ON UPDATE CURRENT_TIMEST. | CURRENT_TIMESTAMP | Last profile update timestamp
+
+Indices:
+- PRIMARY KEY (`id`)
+- UNIQUE KEY (`email`)
+- INDEX `idx_users_role` (`role`)
+
+
+--------------------------------------------------------------------------------
+TABLE 2: venues
+--------------------------------------------------------------------------------
+Description: Physical campus locations/auditoriums with defined safe capacities.
+
+Column Name | Data Type                   | Constraints               | Default           | Description
+------------+-----------------------------+---------------------------+-------------------+-------------------------------------------
+id          | INT                         | PRIMARY KEY, AUTO_INCR    | -                 | Unique venue identifier (PK)
+name        | VARCHAR(100)                | NOT NULL                  | -                 | Name of the venue (e.g., "Main Auditorium")
+location    | VARCHAR(255)                | NOT NULL                  | -                 | Campus location / block / floor
+capacity    | INT                         | NOT NULL                  | 0                 | Maximum safe crowd capacity limit
+status      | ENUM('available',           | NOT NULL                  | 'available'       | Operational availability status
+            |      'unavailable')         |                           |                   |
+created_at  | TIMESTAMP                   | DEFAULT CURRENT_TIMESTAMP | CURRENT_TIMESTAMP | Venue registration timestamp
+updated_at  | TIMESTAMP                   | ON UPDATE CURRENT_TIMEST. | CURRENT_TIMESTAMP | Last record update timestamp
+
+Indices:
+- PRIMARY KEY (`id`)
+
+
+--------------------------------------------------------------------------------
+TABLE 3: fest
+--------------------------------------------------------------------------------
+Description: Umbrella banner or festival grouping multiple individual events.
+
+Column Name | Data Type    | Constraints               | Default           | Description
+------------+--------------+---------------------------+-------------------+-------------------------------------------
+id          | INT          | PRIMARY KEY, AUTO_INCR    | -                 | Unique series identifier (PK)
+name        | VARCHAR(150) | NOT NULL                  | -                 | Series/Fest title (e.g. "TechSprint 2026")
+description | TEXT         | NULL                      | NULL              | Series description, theme, or rules
+start_date  | DATE         | NULL                      | NULL              | Series kick-off date
+end_date    | DATE         | NULL                      | NULL              | Series conclusion date
+created_at  | TIMESTAMP    | DEFAULT CURRENT_TIMESTAMP | CURRENT_TIMESTAMP | Creation timestamp
+updated_at  | TIMESTAMP    | ON UPDATE CURRENT_TIMEST. | CURRENT_TIMESTAMP | Last record update timestamp
+
+Indices:
+- PRIMARY KEY (`id`)
+- INDEX `idx_series_dates` (`start_date`, `end_date`)
+
+
+--------------------------------------------------------------------------------
+TABLE 4: events
+--------------------------------------------------------------------------------
+Description: Event lifecycle from organizer proposal through management approval.
+
+Column Name          | Data Type                                                 | Constraints               | Default     | Description
+---------------------+-----------------------------------------------------------+---------------------------+-------------+-----------------------------------------------
+id                   | INT                                                       | PRIMARY KEY, AUTO_INCR    | -           | Unique event identifier (PK)
+organizer_id         | INT                                                       | NOT NULL, FOREIGN KEY     | -           | References users(id) - Event Organizer
+event_name           | VARCHAR(150)                                              | NOT NULL                  | -           | Event title
+description          | TEXT                                                      | NULL                      | NULL        | Event summary, agenda, and guidelines
+status               | ENUM('pending','approved','rejected','completed','cancelled')| NOT NULL              | 'pending'   | Current workflow status of the event
+requested_date       | DATE                                                      | NOT NULL                  | -           | Date originally requested by organizer
+requested_start_time | TIME                                                      | NOT NULL                  | -           | Start time originally requested
+requested_end_time   | TIME                                                      | NOT NULL                  | -           | End time originally requested
+approved_date        | DATE                                                      | NULL                      | NULL        | Final date approved by administrator
+approved_start_time  | TIME                                                      | NULL                      | NULL        | Final start time approved by administrator
+approved_end_time    | TIME                                                      | NULL                      | NULL        | Final end time approved by administrator
+venue_id             | INT                                                       | NULL, FOREIGN KEY         | NULL        | References venues(id) - Assigned venue
+series_id            | INT                                                       | NULL, FOREIGN KEY         | NULL        | References fest(id) - Grouping fest
+category             | VARCHAR(50)                                               | NULL                      | 'General'   | Event genre (Cultural, Technical, Sports)
+rejection_reason     | VARCHAR(255)                                              | NULL                      | NULL        | Reason provided if event is rejected
+created_at           | TIMESTAMP                                                 | DEFAULT CURRENT_TIMESTAMP | CURRENT_TIM.| Creation timestamp
+updated_at           | TIMESTAMP                                                 | ON UPDATE CURRENT_TIMEST. | CURRENT_TIM.| Last record update timestamp
+
+Foreign Keys:
+- `fk_events_organizer` : FOREIGN KEY (`organizer_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
+- `fk_events_venue`     : FOREIGN KEY (`venue_id`) REFERENCES `venues` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+- `fk_events_series`    : FOREIGN KEY (`series_id`) REFERENCES `fest` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+
+Indices:
+- PRIMARY KEY (`id`)
+- INDEX `idx_events_organizer` (`organizer_id`)
+- INDEX `idx_events_venue_status` (`venue_id`, `status`)
+- INDEX `idx_events_schedule` (`approved_date`, `approved_start_time`, `approved_end_time`)
+- INDEX `idx_events_series` (`series_id`)
+- INDEX `idx_events_category` (`category`)
+
+
+--------------------------------------------------------------------------------
+TABLE 5: images
+--------------------------------------------------------------------------------
+Description: Image frames captured from CCTV cameras or manual uploads for an event.
+
+Column Name       | Data Type                                              | Constraints               | Default     | Description
+------------------+--------------------------------------------------------+---------------------------+-------------+-----------------------------------------------
+id                | INT                                                    | PRIMARY KEY, AUTO_INCR    | -           | Unique image identifier (PK)
+event_id          | INT                                                    | NOT NULL, FOREIGN KEY     | -           | References events(id) - Associated event
+image_path        | VARCHAR(255)                                           | NOT NULL                  | -           | Relative disk path or filename of uploaded img
+uploaded_at       | TIMESTAMP                                              | DEFAULT CURRENT_TIMESTAMP | CURRENT_TIM.| Timestamp when image was received
+processing_status | ENUM('pending','processing','completed','failed')      | NOT NULL                  | 'pending'   | Status of ML pipeline analysis
+created_at        | TIMESTAMP                                              | DEFAULT CURRENT_TIMESTAMP | CURRENT_TIM.| Record creation timestamp
+updated_at        | TIMESTAMP                                              | ON UPDATE CURRENT_TIMEST. | CURRENT_TIM.| Last record update timestamp
+
+Foreign Keys:
+- `fk_images_event` : FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+
+Indices:
+- PRIMARY KEY (`id`)
+- INDEX `idx_images_event` (`event_id`)
+- INDEX `idx_images_status` (`processing_status`)
+
+
+--------------------------------------------------------------------------------
+TABLE 6: crowd_analyses
+--------------------------------------------------------------------------------
+Description: Deep learning (CSRNet) crowd density and headcount estimation output.
+
+Column Name        | Data Type                                    | Constraints               | Default     | Description
+-------------------+----------------------------------------------+---------------------------+-------------+-----------------------------------------------
+id                 | INT                                          | PRIMARY KEY, AUTO_INCR    | -           | Unique analysis record identifier (PK)
+image_id           | INT                                          | NOT NULL, UNIQUE, FK      | -           | References images(id) - Exactly 1 per image
+predicted_count    | INT                                          | NOT NULL                  | -           | Headcount estimated by neural network
+analysis_timestamp | TIMESTAMP                                    | DEFAULT CURRENT_TIMESTAMP | CURRENT_TIM.| Timestamp when inference executed
+processing_status  | ENUM('pending','completed','failed')         | NOT NULL                  | 'completed' | Status of AI model inference
+model_name         | VARCHAR(50)                                  | NOT NULL                  | 'CSRNet'    | Model identifier (e.g., 'CSRNet')
+created_at         | TIMESTAMP                                    | DEFAULT CURRENT_TIMESTAMP | CURRENT_TIM.| Record creation timestamp
+updated_at         | TIMESTAMP                                    | ON UPDATE CURRENT_TIMEST. | CURRENT_TIM.| Last record update timestamp
+
+Foreign Keys:
+- `fk_crowd_analyses_image` : FOREIGN KEY (`image_id`) REFERENCES `images` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+
+Indices:
+- PRIMARY KEY (`id`)
+- UNIQUE KEY (`image_id`)
+- INDEX `idx_crowd_analyses_timestamp` (`analysis_timestamp`)
+- INDEX `idx_crowd_analyses_count` (`predicted_count`)
+
+
+--------------------------------------------------------------------------------
+TABLE 7: alerts
+--------------------------------------------------------------------------------
+Description: Notifications triggered when predicted crowd count exceeds venue capacity.
+
+Column Name       | Data Type             | Constraints               | Default     | Description
+------------------+-----------------------+---------------------------+-------------+-----------------------------------------------
+id                | INT                   | PRIMARY KEY, AUTO_INCR    | -           | Unique alert identifier (PK)
+event_id          | INT                   | NOT NULL, FOREIGN KEY     | -           | References events(id) - Event with breach
+user_id           | INT                   | NOT NULL, FOREIGN KEY     | -           | References users(id) - Recipient user
+crowd_analysis_id | INT                   | NULL, FOREIGN KEY         | NULL        | References crowd_analyses(id) - Triggering run
+detected_count    | INT                   | NOT NULL                  | -           | Real-time crowd count detected
+threshold         | INT                   | NOT NULL                  | -           | Maximum safe capacity threshold
+message           | VARCHAR(255)          | NOT NULL                  | -           | Descriptive human-readable warning message
+status            | ENUM('unread','read') | NOT NULL                  | 'unread'    | Notification read status
+created_at        | TIMESTAMP             | DEFAULT CURRENT_TIMESTAMP | CURRENT_TIM.| Timestamp when alert was fired
+
+Foreign Keys:
+- `fk_alerts_event`    : FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+- `fk_alerts_user`     : FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+- `fk_alerts_analysis` : FOREIGN KEY (`crowd_analysis_id`) REFERENCES `crowd_analyses` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+
+Indices:
+- PRIMARY KEY (`id`)
+- INDEX `idx_alerts_user_status` (`user_id`, `status`)
+- INDEX `idx_alerts_event` (`event_id`)
+
+================================================================================
+3. RELATIONSHIPS & CARDINALITY (FOR DRAWING ER DIAGRAM)
+================================================================================
+
+Relationship 1: users to events
+---------------------------------
+- Type        : One-to-Many (1 : N)
+- Parent Table: users (PK: id)
+- Child Table : events (FK: organizer_id)
+- Notation    : User (1) ----< (0..N) Event
+- Meaning     : One User (organizer) can organize zero, one, or many events.
+                Each event must have exactly one organizer.
+- Delete Rule : ON DELETE RESTRICT (Cannot delete a user who has active events).
+
+Relationship 2: venues to events
+---------------------------------
+- Type        : One-to-Many (1 : N)
+- Parent Table: venues (PK: id)
+- Child Table : events (FK: venue_id)
+- Notation    : Venue (1) ----< (0..N) Event
+- Meaning     : One Venue can host zero, one, or multiple events over time.
+                An event can be unassigned (venue_id IS NULL) while pending,
+                or assigned to exactly one venue upon approval.
+- Delete Rule : ON DELETE SET NULL.
+
+Relationship 3: fest to events
+---------------------------------------
+- Type        : One-to-Many (1 : N)
+- Parent Table: fest (PK: id)
+- Child Table : events (FK: series_id)
+- Notation    : Fest (1) ----< (0..N) Event
+- Meaning     : A Fest can group zero, one, or many events.
+                An individual standalone event may not belong to any series (series_id IS NULL).
+- Delete Rule : ON DELETE SET NULL.
+
+Relationship 4: events to images
+---------------------------------
+- Type        : One-to-Many (1 : N)
+- Parent Table: events (PK: id)
+- Child Table : images (FK: event_id)
+- Notation    : Event (1) ----< (0..N) Image
+- Meaning     : One event can have multiple surveillance images uploaded over its duration.
+                Each uploaded image strictly belongs to exactly one event.
+- Delete Rule : ON DELETE CASCADE (Deleting an event deletes all its uploaded images).
+
+Relationship 5: images to crowd_analyses
+-----------------------------------------
+- Type        : One-to-One (1 : 1 or 1 : 0..1)
+- Parent Table: images (PK: id)
+- Child Table : crowd_analyses (FK: image_id, UNIQUE)
+- Notation    : Image (1) ---- (0..1) CrowdAnalysis
+- Meaning     : Each image has at most one crowd analysis record (image_id has a UNIQUE constraint).
+                Each crowd analysis record belongs to exactly one image.
+- Delete Rule : ON DELETE CASCADE (Deleting an image deletes its AI analysis result).
+
+Relationship 6: events to alerts
+---------------------------------
+- Type        : One-to-Many (1 : N)
+- Parent Table: events (PK: id)
+- Child Table : alerts (FK: event_id)
+- Notation    : Event (1) ----< (0..N) Alert
+- Meaning     : An event can trigger zero, one, or multiple overcrowding alerts.
+                Each alert belongs to exactly one event.
+- Delete Rule : ON DELETE CASCADE.
+
+Relationship 7: users to alerts
+--------------------------------
+- Type        : One-to-Many (1 : N)
+- Parent Table: users (PK: id)
+- Child Table : alerts (FK: user_id)
+- Notation    : User (1) ----< (0..N) Alert
+- Meaning     : A user (administrator or organizer) can receive zero, one, or multiple alerts.
+                Each alert notification is addressed to exactly one recipient user.
+- Delete Rule : ON DELETE CASCADE.
+
+Relationship 8: crowd_analyses to alerts
+-----------------------------------------
+- Type        : One-to-Many (1 : N)
+- Parent Table: crowd_analyses (PK: id)
+- Child Table : alerts (FK: crowd_analysis_id)
+- Notation    : CrowdAnalysis (1) ----< (0..N) Alert
+- Meaning     : A single crowd analysis calculation that breaches safe capacity can
+                generate alerts for multiple stakeholders (e.g., both administrator and organizer).
+                If the analysis record is removed, the alert record retains its count log.
+- Delete Rule : ON DELETE SET NULL.
+
+================================================================================
+4. COPY-PASTE ER DIAGRAM FORMATS
+================================================================================
+
+--------------------------------------------------------------------------------
+A. dbdiagram.io / DBML Syntax (Paste at https://dbdiagram.io)
+--------------------------------------------------------------------------------
+
+Table users {
+  id int [pk, increment]
+  name varchar(100) [not null]
+  email varchar(150) [unique, not null]
+  password_hash varchar(255) [not null]
+  role varchar(20) [not null, note: 'administrator, organizer']
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table venues {
+  id int [pk, increment]
+  name varchar(100) [not null]
+  location varchar(255) [not null]
+  capacity int [not null, default: 0]
+  status varchar(20) [not null, default: 'available']
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table fest {
+  id int [pk, increment]
+  name varchar(150) [not null]
+  description text
+  start_date date
+  end_date date
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table events {
+  id int [pk, increment]
+  organizer_id int [not null, ref: > users.id]
+  event_name varchar(150) [not null]
+  description text
+  status varchar(20) [not null, default: 'pending']
+  requested_date date [not null]
+  requested_start_time time [not null]
+  requested_end_time time [not null]
+  approved_date date
+  approved_start_time time
+  approved_end_time time
+  venue_id int [ref: > venues.id]
+  series_id int [ref: > fest.id]
+  category varchar(50) [default: 'General']
+  rejection_reason varchar(255)
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table images {
+  id int [pk, increment]
+  event_id int [not null, ref: > events.id]
+  image_path varchar(255) [not null]
+  uploaded_at timestamp
+  processing_status varchar(20) [not null, default: 'pending']
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table crowd_analyses {
+  id int [pk, increment]
+  image_id int [unique, not null, ref: - images.id]
+  predicted_count int [not null]
+  analysis_timestamp timestamp
+  processing_status varchar(20) [not null, default: 'completed']
+  model_name varchar(50) [not null, default: 'CSRNet']
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table alerts {
+  id int [pk, increment]
+  event_id int [not null, ref: > events.id]
+  user_id int [not null, ref: > users.id]
+  crowd_analysis_id int [ref: > crowd_analyses.id]
+  detected_count int [not null]
+  threshold int [not null]
+  message varchar(255) [not null]
+  status varchar(20) [not null, default: 'unread']
+  created_at timestamp
+}
+
+
+--------------------------------------------------------------------------------
+B. Mermaid ER Diagram Syntax (Paste in Mermaid Live Editor or Markdown)
+--------------------------------------------------------------------------------
+
+erDiagram
+    users ||--o{ events : "organizes"
+    venues ||--o{ events : "hosts"
+    fest ||--o{ events : "groups"
+    events ||--o{ images : "contains"
+    images ||--o| crowd_analyses : "analyzed_by"
+    events ||--o{ alerts : "triggers"
+    users ||--o{ alerts : "receives"
+    crowd_analyses ||--o{ alerts : "originates"
+
+    users {
+        int id PK
+        string name
+        string email UK
+        string password_hash
+        string role
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    venues {
+        int id PK
+        string name
+        string location
+        int capacity
+        string status
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    fest {
+        int id PK
+        string name
+        string description
+        date start_date
+        date end_date
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    events {
+        int id PK
+        int organizer_id FK
+        string event_name
+        string description
+        string status
+        date requested_date
+        time requested_start_time
+        time requested_end_time
+        date approved_date
+        time approved_start_time
+        time approved_end_time
+        int venue_id FK
+        int series_id FK
+        string category
+        string rejection_reason
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    images {
+        int id PK
+        int event_id FK
+        string image_path
+        timestamp uploaded_at
+        string processing_status
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    crowd_analyses {
+        int id PK
+        int image_id FK,UK
+        int predicted_count
+        timestamp analysis_timestamp
+        string processing_status
+        string model_name
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    alerts {
+        int id PK
+        int event_id FK
+        int user_id FK
+        int crowd_analysis_id FK
+        int detected_count
+        int threshold
+        string message
+        string status
+        timestamp created_at
+    }
+
+================================================================================
+END OF SPECIFICATION DOCUMENT
+================================================================================

@@ -1,0 +1,56 @@
+﻿# Environments
+venv/
+backend/venv/
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment variables
+.env
+*.env.local
+
+# IDE
+.vscode/
+.idea/
+
+# Sensitive project files
+college_mgmt_secret_2026.txt
+
+# All environment secrets
+.env.*
+!.env.example
+
+# Runtime-uploaded event images
+backend/uploads/
+
+# Python test and training artifacts
+.pytest_cache/
+*.log
+
+# Local virtual environments
+backend/venv/
+
+# AI training datasets and experiment checkpoints
+backend/ai/datasets/
+backend/ai/experiments/
+
+# Local event uploads
+backend/uploads/
+
+# Python cache and logs
+__pycache__/
+*.pyc
+*.log
+# Large AI model weights
+backend/ai/weights/*.pth
+
+# Crowd-counting evaluation datasets
+backend/tests/datasets/ucf_cc_50/
+backend/ai/datasets/
+backend/ai/experiments/
+
+# Runtime event image uploads
+backend/uploads/

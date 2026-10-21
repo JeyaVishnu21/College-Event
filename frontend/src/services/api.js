@@ -7,16 +7,22 @@
  * Hostname is matched to window.location (localhost vs 127.0.0.1) to avoid cookie drops.
  */
 
-const API_HOST = typeof window !== 'undefined' && window.location.hostname === '127.0.0.1' 
-  ? '127.0.0.1' 
+const API_HOST = typeof window !== 'undefined' && window.location.hostname === '127.0.0.1'
+  ? '127.0.0.1'
   : 'localhost';
 
-export const API_BASE_URL = import.meta.env?.VITE_API_URL || `http://${API_HOST}:5000/api`;
+const DEFAULT_API_URL = import.meta.env.PROD
+  ? 'https://college-event-q63r.onrender.com/api'
+  : `http://${API_HOST}:5000/api`;
+
+export const API_BASE_URL = import.meta.env?.VITE_API_URL || DEFAULT_API_URL;
+
+const BACKEND_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, '');
 
 export function getBackendAssetUrl(path) {
   if (!path) return '';
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
-  return `http://${API_HOST}:5000${path.startsWith('/') ? '' : '/'}${path}`;
+  return `${BACKEND_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
 }
 
 /**

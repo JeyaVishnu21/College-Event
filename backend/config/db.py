@@ -15,7 +15,7 @@ from config.settings import settings
 def get_db_connection(include_db: bool = True, multi_statements: bool = False) -> pymysql.connections.Connection:
     """
     Establish and return a MySQL database connection using settings.
-    
+
     :param include_db: If True, connects directly to settings.DB_NAME.
                        If False, connects to MySQL server without selecting a DB.
     :param multi_statements: If True, enables multi-statement script execution.
@@ -24,6 +24,7 @@ def get_db_connection(include_db: bool = True, multi_statements: bool = False) -
     client_flag = 0
     if multi_statements:
         client_flag |= pymysql.constants.CLIENT.MULTI_STATEMENTS
+
 
     return pymysql.connect(
         host=settings.DB_HOST,
@@ -35,8 +36,10 @@ def get_db_connection(include_db: bool = True, multi_statements: bool = False) -
         cursorclass=pymysql.cursors.DictCursor,
         client_flag=client_flag,
         autocommit=True,
-        connect_timeout=3
+        connect_timeout=10,
+        ssl={"ssl": True}
     )
+
 
 
 def check_db_status() -> Dict[str, Any]:
